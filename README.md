@@ -1,7 +1,7 @@
 # Miden OTC Swap Board
 
-**Live Demo:** https://miden-credential-verifier.vercel.app  
-**GitHub:** https://github.com/the1zinc/miden-credential-verifier
+**Live Demo:** https://miden-otc-swap-board.vercel.app  
+**GitHub:** https://github.com/the1zinc/miden-otc-swap-board
 
 A Next.js 14 dApp demonstrating trustless, Peer-to-Peer atomic swaps natively on the Miden Testnet. Instead of relying on complex, heavy smart contracts (like Uniswap on EVM), this app leverages Miden's Actor-Model and Note-based architecture to execute decentralized trades directly between users.
 
