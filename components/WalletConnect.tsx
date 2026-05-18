@@ -121,7 +121,7 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
               {connecting && (
                 <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
               )}
-              {/* Official adapter button — connects to real Miden extension */}
+              {/* Official adapter button connects to the real Miden extension. */}
               <WalletMultiButton />
               <button
                 onClick={useDemoWallet}
@@ -141,7 +141,7 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
           <span>
             No Miden extension detected. Install the{" "}
             <a
-              href="https://chromewebstore.google.com/detail/miden-wallet/abcdefgh"
+              href="https://chromewebstore.google.com/detail/miden-wallet/ablmompanofnodfdkgchkpmphailefpb"
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:no-underline"

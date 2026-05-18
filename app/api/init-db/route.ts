@@ -1,28 +1,25 @@
 import { NextResponse } from "next/server";
-import sql from "@/lib/db";
+import { ensureSwapRegistry } from "@/lib/swaps";
 
 export async function GET() {
+  return NextResponse.json(
+    { error: "Use POST /api/init-db to initialize the swap registry." },
+    { status: 405 }
+  );
+}
+
+export async function POST(request: Request) {
   try {
-    // Create active_swaps table
-    await sql`
-      CREATE TABLE IF NOT EXISTS active_swaps (
-          id SERIAL PRIMARY KEY,
-          note_id VARCHAR(255) UNIQUE NOT NULL,
-          creator_account VARCHAR(255) NOT NULL,
-          offering_asset VARCHAR(100) NOT NULL,
-          offering_amount NUMERIC NOT NULL,
-          requesting_asset VARCHAR(100) NOT NULL,
-          requesting_amount NUMERIC NOT NULL,
-          status VARCHAR(50) DEFAULT 'open',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
+    const secret = process.env.INIT_DB_SECRET;
+    const provided = request.headers.get("x-init-secret");
 
-    // Create indexes
-    await sql`CREATE INDEX IF NOT EXISTS idx_swaps_status ON active_swaps(status)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_swaps_creator ON active_swaps(creator_account)`;
+    if (secret && provided !== secret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    return NextResponse.json({ message: "Database tables and indexes created successfully!" });
+    await ensureSwapRegistry();
+
+    return NextResponse.json({ message: "Swap registry initialized." });
   } catch (error) {
     console.error("Failed to initialize database:", error);
     return NextResponse.json(

@@ -14,10 +14,29 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [noteId, setNoteId] = useState("");
   const [offeringAsset, setOfferingAsset] = useState("MIDEN");
   const [offeringAmount, setOfferingAmount] = useState("100");
   const [requestingAsset, setRequestingAsset] = useState("FaucetTokenB");
   const [requestingAmount, setRequestingAmount] = useState("50");
+
+  const isDemoWallet = accountId?.startsWith("miden1sim") ?? false;
+
+  async function signListing(payload: string) {
+    if (isDemoWallet) return null;
+    if (!connected || !signBytes) {
+      throw new Error("Connect the Miden Wallet extension to sign this listing.");
+    }
+
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(payload),
+    );
+    const signature = await signBytes(new Uint8Array(digest), "word");
+    return Array.from(signature)
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
 
   async function handleCreateSwap(e: React.FormEvent) {
     e.preventDefault();
@@ -26,52 +45,43 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
       return;
     }
 
+    const listingNoteId = noteId.trim() || (isDemoWallet ? `demo-${crypto.randomUUID()}` : "");
+    if (!listingNoteId) {
+      setError("Paste the Miden note ID you want to list.");
+      return;
+    }
+
     setIsCreating(true);
     setError(null);
     setSuccess(false);
 
     try {
-      // Prompt wallet extension if connected and using real wallet adapter
-      let confirmed = false;
-      
-      if (connected && signBytes) {
-        try {
-          // Attempt to trigger a signature popup from the real extension
-          // Miden "word" expects 32 bytes, so we pad it to exactly 32 bytes
-          const msgString = "Approve Miden Swap".padEnd(32, " ");
-          const msg = new TextEncoder().encode(msgString);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await signBytes(msg, "word" as any);
-          confirmed = true;
-        } catch (e: unknown) {
-          console.warn("Wallet signing issue:", e);
-          // If the wallet rejects or method fails, fallback
-          confirmed = window.confirm("Approve creating this Swap Note on the Miden Testnet?");
-        }
-      } else {
-        // Fallback for Demo Wallet
-        confirmed = window.confirm("Approve creating this Swap Note on the Miden Testnet?");
-      }
-
-      if (!confirmed) {
+      if (isDemoWallet && !window.confirm("Publish this demo listing to the registry?")) {
         throw new Error("User rejected the transaction.");
       }
-      
-      // Simulate real node broadcast
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      const simulatedNoteId = `0x${crypto.randomUUID().replace(/-/g, "")}`;
+
+      const payload = JSON.stringify({
+        note_id: listingNoteId,
+        creator_account: accountId,
+        offering_asset: offeringAsset,
+        offering_amount: offeringAmount,
+        requesting_asset: requestingAsset,
+        requesting_amount: requestingAmount,
+      });
+      const approvalSignature = await signListing(payload);
 
       const res = await fetch("/api/swaps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          note_id: simulatedNoteId,
+          note_id: listingNoteId,
+          note_type: "public",
           creator_account: accountId,
           offering_asset: offeringAsset,
           offering_amount: offeringAmount,
           requesting_asset: requestingAsset,
           requesting_amount: requestingAmount,
+          approval_signature: approvalSignature,
         }),
       });
 
@@ -81,6 +91,7 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
       }
 
       setSuccess(true);
+      if (isDemoWallet && !noteId.trim()) setNoteId("");
       
       // Reset form slightly to allow more creations
       setTimeout(() => setSuccess(false), 5000);
@@ -104,7 +115,7 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
       <div className="mb-6 flex items-center justify-between border-b border-emerald-500/10 pb-5 light:border-emerald-600/15">
         <div>
           <h2 className="text-xl font-bold text-emerald-300 light:text-emerald-800">Create Swap Note</h2>
-          <p className="mt-1 text-xs font-medium text-zinc-400 light:text-zinc-500">Offer an asset to request another</p>
+          <p className="mt-1 text-xs font-medium text-zinc-400 light:text-zinc-500">Publish a signed listing for a Miden note</p>
         </div>
         <ArrowRightLeft className="h-5 w-5 text-emerald-500/50 light:text-emerald-600/50" />
       </div>
@@ -116,26 +127,38 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
         </div>
       ) : (
         <form onSubmit={handleCreateSwap} className="flex flex-1 flex-col justify-between space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-emerald-300/70 light:text-emerald-700/80">Miden Note ID</label>
+            <input
+              value={noteId}
+              onChange={(e) => setNoteId(e.target.value)}
+              placeholder={isDemoWallet ? "Optional in demo mode" : "Paste note ID from your wallet"}
+              className={inputCls}
+            />
+            <p className="text-[11px] leading-relaxed text-zinc-500 light:text-zinc-500">
+              The board stores the listing. The note itself must already exist on Miden.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-emerald-300/70 light:text-emerald-700/80">You Offer</label>
               <input 
                 type="number" 
                 required
+                min="0"
+                step="any"
                 value={offeringAmount}
                 onChange={(e) => setOfferingAmount(e.target.value)}
                 className={inputCls}
               />
-              <select 
+              <input
+                list="miden-asset-suggestions"
                 value={offeringAsset}
                 onChange={(e) => setOfferingAsset(e.target.value)}
+                placeholder="Faucet or asset ID"
                 className={inputCls}
-              >
-                <option value="MIDEN">MIDEN</option>
-                <option value="FaucetTokenA">TokenA</option>
-                <option value="FaucetTokenB">TokenB</option>
-                <option value="USDC_TEST">USDC</option>
-              </select>
+              />
             </div>
             
             <div className="space-y-2">
@@ -143,22 +166,28 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
               <input 
                 type="number" 
                 required
+                min="0"
+                step="any"
                 value={requestingAmount}
                 onChange={(e) => setRequestingAmount(e.target.value)}
                 className={inputCls}
               />
-              <select 
+              <input
+                list="miden-asset-suggestions"
                 value={requestingAsset}
                 onChange={(e) => setRequestingAsset(e.target.value)}
+                placeholder="Faucet or asset ID"
                 className={inputCls}
-              >
-                <option value="FaucetTokenB">TokenB</option>
-                <option value="MIDEN">MIDEN</option>
-                <option value="FaucetTokenA">TokenA</option>
-                <option value="USDC_TEST">USDC</option>
-              </select>
+              />
             </div>
           </div>
+
+          <datalist id="miden-asset-suggestions">
+            <option value="MIDEN" />
+            <option value="FaucetTokenA" />
+            <option value="FaucetTokenB" />
+            <option value="USDC_TEST" />
+          </datalist>
 
           <div className="mt-auto pt-4">
             <button
@@ -169,16 +198,16 @@ export default function CreateSwap({ accountId }: CreateSwapProps) {
               {isCreating ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing Note...
+                  Publishing Listing...
                 </>
               ) : (
-                "Sign & Broadcast Note"
+                "Sign & Publish Listing"
               )}
             </button>
 
             {success && (
               <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-950/30 p-3 text-center text-sm font-medium text-emerald-200 light:bg-emerald-50 light:text-emerald-800 light:border-emerald-400/30">
-                Swap Note successfully created on Testnet!
+                Swap listing published. Settle the note in Miden Wallet.
               </div>
             )}
             

@@ -43,7 +43,7 @@ export default function Home() {
             <CreateSwap accountId={accountId} />
           </div>
           <div className="h-full">
-            <SwapBoard />
+            <SwapBoard accountId={accountId} />
           </div>
         </div>
 

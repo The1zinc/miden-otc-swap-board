@@ -3,18 +3,18 @@
 **Live Demo:** https://miden-otc-swap-board.vercel.app  
 **GitHub:** https://github.com/the1zinc/miden-otc-swap-board
 
-A Next.js 14 dApp demonstrating trustless, Peer-to-Peer atomic swaps natively on the Miden Testnet. Instead of relying on complex, heavy smart contracts (like Uniswap on EVM), this app leverages Miden's Actor-Model and Note-based architecture to execute decentralized trades directly between users.
+A Next.js 14 dApp prototype for a Miden Testnet OTC swap board. Vercel hosts the UI and a Neon-backed registry of signed note listings; Miden wallet actions stay client-side in the browser extension.
 
 ## How It Works
 
 1. **Wallet Connection:** Users connect their Miden Wallet Extension.
-2. **Create Swap Note:** A user creates a "Swap Note" specifying what they are offering (e.g., 100 TokenA) and the script requires what they want in return (e.g., 50 TokenB).
-3. **Database Registry:** The unique `note_id` and trade details are stored in Neon Postgres.
-4. **Consume Note:** Another user browses the Swap Board, sees the offer, and clicks "Take Trade". Their wallet extension consumes the Note, granting them TokenA and automatically firing a new Note containing TokenB back to the creator.
+2. **Publish Listing:** A user pastes an existing Miden note ID, signs the listing, and publishes the trade details.
+3. **Database Registry:** The `note_id`, trade details, and optional approval signature are stored in Neon Postgres.
+4. **Consume Note:** Another user browses the Swap Board and asks the wallet extension to consume the public note. After the wallet returns a transaction ID, the registry marks the listing fulfilled.
 
 ## Why This Architecture?
 
-On traditional blockchains, an atomic swap requires an Escrow Smart Contract to hold both parties' funds. On Miden, the execution logic is embedded directly into the **Note**. When User B consumes the Note, the Miden VM strictly enforces the Note's script. If User B's transaction does not simultaneously create the payment note back to User A, the entire transaction is invalid and reverted. This enables completely decentralized, local OTC trading without liquidity pools or smart contract risk.
+On traditional blockchains, an atomic swap requires an escrow smart contract to hold both parties' funds. On Miden, execution logic can live directly in a **Note**. This prototype keeps the deployable Vercel surface small: the app is a listing registry plus wallet handoff, while note scripting and settlement remain in the user's Miden wallet flow.
 
 ## Local Development
 
@@ -25,11 +25,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Required environment variables (`.env.local`):
+Environment variables for a persistent registry (`.env.local`):
 
 ```bash
 DATABASE_URL=your_neon_connection_string_here
+NEXT_PUBLIC_MIDEN_RPC=https://rpc.testnet.miden.io:443
 ```
+
+Without `DATABASE_URL`, Demo mode uses an in-memory registry for local testing.
 
 ## Neon Setup
 
